@@ -12,131 +12,357 @@ interface LogLine {
   selector: "app-main-page",
   standalone: true,
   template: `
-    <main class="shell">
-      <header class="hero">
-        <p class="eyebrow">Angular Consumer Showcase</p>
+    <main class="page">
+      <header class="intro">
+        <p class="kicker">Angular Consumer Showcase</p>
         <h1>Browser Message Bus</h1>
-        <p>
-          Diese Anwendung bindet <code>@lorenz/browser-message-bus</code> wie eine normale npm-Abhängigkeit ein.
-          Angular kennt keine internen Dateien der Bibliothek.
+        <p class="lead">
+          Eine kleine Angular-Anwendung, die die öffentliche API von
+          <code>@lorenz/browser-message-bus</code> als normale npm-Abhängigkeit verwendet.
         </p>
-        <div class="identity">
-          <span>appId: <strong>{{ bus.role }}</strong></span>
-          <span>instanceId: <code>{{ bus.bus.instanceId }}</code></span>
+
+        <div class="runtime" aria-label="Aktive Bus-Instanz">
+          <span class="status-dot" aria-hidden="true"></span>
+          <strong>Bus aktiv</strong>
+          <span>appId <code>{{ showcase.role }}</code></span>
+          <span>instanceId <code>{{ short(showcase.messageBus.instanceId) }}</code></span>
         </div>
       </header>
 
-      <section class="grid">
-        <article class="card">
-          <h2>1. Tab ↔ Tab</h2>
-          <p>Same-Origin-Kommunikation läuft automatisch über <code>BroadcastChannel</code>.</p>
-          <div class="row">
-            <input #broadcastInput value="Hallo aus Angular" aria-label="Broadcast-Nachricht">
-            <button (click)="broadcast(broadcastInput.value)">Broadcast senden</button>
-          </div>
-          <button class="secondary" (click)="openSecondTab()">Zweiten Tab öffnen</button>
-        </article>
+      <nav class="toc" aria-label="Use Cases">
+        <a href="#integration">Einbindung</a>
+        <a href="#broadcast">Broadcast</a>
+        <a href="#presence">Presence</a>
+        <a href="#targeting">Targeting & RPC</a>
+        <a href="#bridge">Cross-Origin Bridge</a>
+        <a href="#persistence">Persistent Log</a>
+      </nav>
 
-        <article class="card">
-          <h2>2. Presence</h2>
-          <p>Aktuell bekannte Bus-Teilnehmer:</p>
-          @if (bus.peers().length === 0) {
-            <p class="muted">Noch keine anderen Instanzen gesehen.</p>
-          } @else {
-            <ul class="peers">
-              @for (peer of bus.peers(); track peer.instanceId) {
-                <li><strong>{{ peer.appId ?? "ohne appId" }}</strong> · <code>{{ short(peer.instanceId) }}</code></li>
-              }
-            </ul>
-          }
-        </article>
-
-        <article class="card wide">
-          <h2>3. Viewer-Popup mit Targeting und Request/Reply</h2>
+      <section id="integration" class="use-case intro-case">
+        <div class="case-copy">
+          <p class="number">00 · Einbindung</p>
+          <h2>Wie Angular die Library verwendet</h2>
           <p>
-            Öffne mehrere Viewer. Der Host adressiert danach eine konkrete <code>instanceId</code>.
+            Der Message Bus selbst kennt Angular nicht. In der Anwendung wird einmal ein Angular-Service erstellt,
+            der den Bus und die benötigten Extensions kapselt. Components greifen danach über Dependency Injection
+            darauf zu.
           </p>
-          <div class="row wrap">
-            <button (click)="openViewer()">Viewer öffnen</button>
-            <select #viewerSelect aria-label="Viewer auswählen">
-              <option value="">Viewer auswählen</option>
-              @for (viewer of viewerPeers(); track viewer.instanceId) {
-                <option [value]="viewer.instanceId">{{ short(viewer.instanceId) }}</option>
-              }
-            </select>
-            <input #documentInput value="DOC-4711" aria-label="Dokument-ID">
-            <button (click)="openDocument(viewerSelect.value, documentInput.value)">Dokument öffnen</button>
-            <button class="secondary" (click)="readViewerState(viewerSelect.value)">State abfragen</button>
+          <div class="explanation">
+            <strong>Warum das ein echter Consumer-Test ist</strong>
+            <p>
+              Der Code importiert ausschließlich über <code>@lorenz/browser-message-bus</code> und dessen öffentliche
+              Subpath-Exports. Wenn <code>npm run build</code> erfolgreich ist, wurden Paket, ESM-Exports und
+              TypeScript-Deklarationen korrekt aufgelöst.
+            </p>
           </div>
-          <p class="result">{{ viewerResult() }}</p>
-        </article>
+        </div>
 
-        <article class="card wide">
-          <h2>4. Cross-Origin iframe</h2>
-          <p>
-            Der zweite Angular-Dev-Server läuft auf Port 4300. Die Bridge nutzt <code>postMessage</code> nur für den
-            Handshake und danach einen dedizierten <code>MessagePort</code>.
-          </p>
-
-          @if (iframeVisible()) {
-            <iframe
-              #childFrame
-              class="demo-frame"
-              src="http://127.0.0.1:4300/iframe"
-              title="Cross-Origin Angular iframe"
-              (load)="connectIframe()"></iframe>
-          } @else {
-            <div class="frame-placeholder">iframe wurde entfernt.</div>
-          }
-
-          <div class="row wrap">
-            <button [disabled]="!iframeVisible() || iframeConnected()" (click)="connectIframe()">Bridge verbinden</button>
-            <button [disabled]="!iframeConnected()" (click)="sendIframeMessage()">Nachricht senden</button>
-            <button class="secondary" [disabled]="!iframeVisible()" (click)="removeIframe()">iframe entfernen</button>
-            <button class="secondary" [disabled]="iframeVisible()" (click)="restoreIframe()">iframe wiederherstellen</button>
-          </div>
-          <p class="result">{{ iframeStatus() }}</p>
-        </article>
-
-        <article class="card">
-          <h2>5. Persistent Log</h2>
-          <p>Ausgewählte fachliche Events werden im Host optional in IndexedDB gespeichert.</p>
-          <div class="row wrap">
-            <button (click)="loadPersistentLog()">Log lesen</button>
-            <button class="secondary" (click)="clearPersistentLog()">Log löschen</button>
-          </div>
-          <pre>{{ persistentLogText() }}</pre>
-        </article>
-
-        <article class="card">
-          <h2>Live-Ereignisse</h2>
-          @if (events().length === 0) {
-            <p class="muted">Noch keine Nachrichten.</p>
-          } @else {
-            <ul class="events">
-              @for (event of events(); track $index) {
-                <li><time>{{ event.time }}</time> {{ event.text }}</li>
-              }
-            </ul>
-          }
-        </article>
+        <div class="code-panel">
+          <div class="code-title">showcase-bus.service.ts</div>
+          <pre><code>{{ integrationCode }}</code></pre>
+        </div>
       </section>
+
+      <section id="broadcast" class="use-case">
+        <div class="case-copy">
+          <p class="number">01 · Publish / Subscribe</p>
+          <h2>Tabs synchronisieren</h2>
+          <p>
+            Typischer Use Case: Zwei Fenster derselben Web-Anwendung sollen auf ein Ereignis reagieren, ohne einen
+            Backend-Roundtrip. Im gleichen Origin nutzt der Bus automatisch <code>BroadcastChannel</code>.
+          </p>
+          <div class="demo-box">
+            <div class="demo-head">
+              <strong>Live-Demo</strong>
+              <span>Öffne einen zweiten Tab und sende eine Nachricht.</span>
+            </div>
+            <div class="controls">
+              <input #broadcastInput value="Dokument wurde aktualisiert" aria-label="Broadcast-Nachricht">
+              <button (click)="broadcast(broadcastInput.value)">Senden</button>
+              <button class="ghost" (click)="openSecondTab()">Zweiten Tab öffnen</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-panel">
+          <div class="code-title">Component</div>
+          <pre><code>{{ broadcastCode }}</code></pre>
+        </div>
+      </section>
+
+      <section id="presence" class="use-case">
+        <div class="case-copy">
+          <p class="number">02 · Presence</p>
+          <h2>Laufende Instanzen erkennen</h2>
+          <p>
+            Presence ist sinnvoll, wenn die Anwendung wissen möchte, welche anderen Bus-Instanzen gerade erreichbar
+            sind – etwa offene Viewer, Tabs oder eingebettete Anwendungen.
+          </p>
+          <div class="demo-box">
+            <div class="demo-head">
+              <strong>Bekannte Peers</strong>
+              <span>{{ showcase.peers().length }} andere Instanz(en)</span>
+            </div>
+            @if (showcase.peers().length === 0) {
+              <p class="empty">Öffne einen zweiten Tab oder Viewer.</p>
+            } @else {
+              <ul class="peer-list">
+                @for (peer of showcase.peers(); track peer.instanceId) {
+                  <li>
+                    <span>{{ peer.appId ?? "ohne appId" }}</span>
+                    <code>{{ short(peer.instanceId) }}</code>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </div>
+
+        <div class="code-panel">
+          <div class="code-title">Presence Extension</div>
+          <pre><code>{{ presenceCode }}</code></pre>
+        </div>
+      </section>
+
+      <section id="targeting" class="use-case">
+        <div class="case-copy">
+          <p class="number">03 · Targeting & Request/Reply</p>
+          <h2>Einen konkreten Viewer ansprechen</h2>
+          <p>
+            Ein Broadcast wäre hier falsch: Wenn mehrere Viewer geöffnet sind, soll nur die ausgewählte
+            <code>instanceId</code> den Befehl erhalten. Für Rückfragen kann auf demselben Bus Request/Reply verwendet
+            werden.
+          </p>
+
+          <div class="demo-box">
+            <div class="demo-head">
+              <strong>Live-Demo</strong>
+              <span>Öffne zwei Viewer und adressiere nur einen davon.</span>
+            </div>
+            <div class="controls wrap">
+              <button (click)="openViewer()">Viewer öffnen</button>
+              <select #viewerSelect aria-label="Viewer auswählen">
+                <option value="">Viewer auswählen</option>
+                @for (viewer of viewerPeers(); track viewer.instanceId) {
+                  <option [value]="viewer.instanceId">{{ short(viewer.instanceId) }}</option>
+                }
+              </select>
+              <input #documentInput value="DOC-4711" aria-label="Dokument-ID">
+              <button (click)="openDocument(viewerSelect.value, documentInput.value)">Dokument öffnen</button>
+              <button class="ghost" (click)="readViewerState(viewerSelect.value)">State abfragen</button>
+            </div>
+            <p class="demo-result">{{ viewerResult() }}</p>
+          </div>
+
+          <details>
+            <summary>Empfängerseite im Viewer</summary>
+            <pre class="inline-code"><code>{{ viewerCode }}</code></pre>
+          </details>
+        </div>
+
+        <div class="code-panel">
+          <div class="code-title">Host: Targeting + Request</div>
+          <pre><code>{{ targetingCode }}</code></pre>
+        </div>
+      </section>
+
+      <section id="bridge" class="use-case">
+        <div class="case-copy">
+          <p class="number">04 · Bridge</p>
+          <h2>Cross-Origin iframe anbinden</h2>
+          <p>
+            <code>BroadcastChannel</code> überschreitet keine Origins. Für ein fremdes iframe wird deshalb explizit
+            eine Bridge aufgebaut. Der Handshake läuft über <code>postMessage</code>; danach transportiert ein
+            dedizierter <code>MessagePort</code> die normalen Bus-Nachrichten.
+          </p>
+
+          <div class="demo-box">
+            <div class="demo-head">
+              <strong>Live-Demo</strong>
+              <span>Host :4200 ↔ iframe :4300</span>
+            </div>
+
+            @if (iframeVisible()) {
+              <iframe
+                #childFrame
+                class="demo-frame"
+                src="http://127.0.0.1:4300/iframe"
+                title="Cross-Origin Angular iframe"
+                (load)="connectIframe()"></iframe>
+            } @else {
+              <div class="frame-placeholder">iframe entfernt</div>
+            }
+
+            <div class="controls wrap">
+              <button [disabled]="!iframeConnected()" (click)="sendIframeMessage()">Nachricht senden</button>
+              <button class="ghost" [disabled]="!iframeVisible()" (click)="removeIframe()">iframe entfernen</button>
+              <button class="ghost" [disabled]="iframeVisible()" (click)="restoreIframe()">iframe laden</button>
+            </div>
+            <p class="demo-result">{{ iframeStatus() }}</p>
+          </div>
+
+          <details>
+            <summary>Gegenseite im iframe</summary>
+            <pre class="inline-code"><code>{{ iframeCode }}</code></pre>
+          </details>
+        </div>
+
+        <div class="code-panel">
+          <div class="code-title">Host: iframeBridge()</div>
+          <pre><code>{{ bridgeCode }}</code></pre>
+        </div>
+      </section>
+
+      <section id="persistence" class="use-case">
+        <div class="case-copy">
+          <p class="number">05 · Persistent Log</p>
+          <h2>Ausgewählte Events lokal speichern</h2>
+          <p>
+            Das Log ist optional. Es speichert ausgewählte, tatsächlich zugestellte Nachrichten in IndexedDB – etwa
+            für lokale Historie, Diagnose oder nachvollziehbare UI-Ereignisse. Es ersetzt kein serverseitiges Audit.
+          </p>
+          <div class="demo-box">
+            <div class="demo-head">
+              <strong>Live-Demo</strong>
+              <span>Erzeuge vorher z. B. einen Broadcast.</span>
+            </div>
+            <div class="controls">
+              <button (click)="loadPersistentLog()">Log lesen</button>
+              <button class="ghost" (click)="clearPersistentLog()">Log löschen</button>
+            </div>
+            <pre class="log-output">{{ persistentLogText() }}</pre>
+          </div>
+        </div>
+
+        <div class="code-panel">
+          <div class="code-title">Persistent Log Extension</div>
+          <pre><code>{{ persistenceCode }}</code></pre>
+        </div>
+      </section>
+
+      <section class="activity">
+        <div>
+          <p class="number">Live</p>
+          <h2>Ereignisse dieser Instanz</h2>
+          <p>Hier sieht man, was im laufenden Host tatsächlich angekommen ist.</p>
+        </div>
+        @if (events().length === 0) {
+          <p class="empty">Noch keine fachlichen Nachrichten empfangen.</p>
+        } @else {
+          <ul class="event-list">
+            @for (event of events(); track $index) {
+              <li><time>{{ event.time }}</time><span>{{ event.text }}</span></li>
+            }
+          </ul>
+        }
+      </section>
+
+      <footer>
+        <strong>Bewusst nicht Teil des Showcases:</strong>
+        Backend-Aufrufe, Authentifizierung und fachliche Berechtigungen. Der Bus verbindet Browser-Kontexte; er ersetzt
+        keine Server-API.
+      </footer>
     </main>
   `
 })
 export class MainPageComponent implements OnInit, OnDestroy {
-  readonly bus = inject(ShowcaseBusService);
+  readonly showcase = inject(ShowcaseBusService);
 
   @ViewChild("childFrame") private childFrame?: ElementRef<HTMLIFrameElement>;
 
   readonly events = signal<readonly LogLine[]>([]);
-  readonly viewerResult = signal("Noch kein Viewer-State abgefragt.");
-  readonly iframeStatus = signal("Bridge noch nicht verbunden.");
+  readonly viewerResult = signal("Noch kein Viewer ausgewählt.");
+  readonly iframeStatus = signal("iframe wird geladen …");
   readonly iframeVisible = signal(true);
   readonly iframeConnected = signal(false);
   readonly persistentLogText = signal("Noch nicht geladen.");
 
-  readonly viewerPeers = computed(() => this.bus.peers().filter(peer => peer.appId === "viewer"));
+  readonly viewerPeers = computed(() => this.showcase.peers().filter(peer => peer.appId === "viewer"));
+
+  readonly integrationCode = `@Injectable({ providedIn: "root" })
+export class ShowcaseBusService {
+  readonly messageBus = createMessageBus<ShowcaseMessages>({
+    channel: "browser-message-bus-angular-showcase",
+    appId: "host"
+  });
+}
+
+// In einer Angular Component:
+readonly showcase = inject(ShowcaseBusService);`;
+
+  readonly broadcastCode = `this.showcase.messageBus.publish("demo.broadcast", {
+  text: "Hallo aus Angular",
+  sentAt: Date.now()
+});
+
+this.showcase.messageBus.subscribe(
+  "demo.broadcast",
+  payload => console.log(payload.text)
+);`;
+
+  readonly presenceCode = `const peers = this.messageBus.use(presence());
+
+peers.onJoin(peer => {
+  console.log("neu:", peer.appId, peer.instanceId);
+});
+
+const openInstances = peers.peers();`;
+
+  readonly targetingCode = `this.showcase.messageBus.publish(
+  "viewer.command",
+  { command: "open", documentId: "DOC-4711" },
+  { target: { instanceId: viewerId } }
+);
+
+const state = await this.showcase.requests.request(
+  "viewer.state.get",
+  undefined,
+  { target: { instanceId: viewerId } }
+);`;
+
+  readonly viewerCode = `this.showcase.messageBus.subscribe("viewer.command", payload => {
+  if (payload.command === "open") {
+    openDocument(payload.documentId);
+  }
+});
+
+this.showcase.requests.handle("viewer.state.get", () => ({
+  documentId: currentDocumentId,
+  status: "open"
+}));`;
+
+  readonly bridgeCode = `const connection = await this.showcase.messageBus.connect(
+  iframeBridge({
+    iframe,
+    origin: "http://127.0.0.1:4300",
+    allowedTopics: ["iframe.command", "iframe.event"]
+  })
+);
+
+this.showcase.messageBus.publish(
+  "iframe.command",
+  { text: "Hallo" },
+  { target: { instanceId: connection.remote.instanceId } }
+);`;
+
+  readonly iframeCode = `await this.showcase.messageBus.connect(
+  windowBridge({
+    targetWindow: window.parent,
+    origin: "http://127.0.0.1:4200",
+    mode: "accept",
+    allowedTopics: ["iframe.command", "iframe.event"]
+  })
+);`;
+
+  readonly persistenceCode = `const log = this.messageBus.use(
+  persistentLog({
+    topics: ["demo.broadcast"],
+    maxEntries: 1000
+  })
+);
+
+await log.ready();
+const entries = await log.read({ order: "desc" });`;
 
   private iframeConnection: BusConnection | undefined;
   private iframeConnecting = false;
@@ -144,20 +370,20 @@ export class MainPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.subscriptions.push(
-      this.bus.bus.subscribe("demo.broadcast", (payload, context) => {
+      this.showcase.messageBus.subscribe("demo.broadcast", (payload, context) => {
         this.pushEvent(`Broadcast von ${this.abbreviate(context.source.instanceId)}: ${payload.text}`);
       }),
-      this.bus.bus.subscribe("viewer.state.changed", (payload, context) => {
+      this.showcase.messageBus.subscribe("viewer.state.changed", (payload, context) => {
         this.pushEvent(
           `Viewer ${this.abbreviate(context.source.instanceId)}: ${payload.status} (${payload.documentId ?? "kein Dokument"})`
         );
       }),
-      this.bus.bus.subscribe("iframe.event", payload => {
+      this.showcase.messageBus.subscribe("iframe.event", payload => {
         this.pushEvent(`iframe: ${payload.text}`);
       })
     );
 
-    void this.bus.log?.ready();
+    void this.showcase.log?.ready();
   }
 
   ngOnDestroy(): void {
@@ -168,7 +394,7 @@ export class MainPageComponent implements OnInit, OnDestroy {
   broadcast(text: string): void {
     const value = text.trim();
     if (!value) return;
-    this.bus.bus.publish("demo.broadcast", { text: value, sentAt: Date.now() });
+    this.showcase.messageBus.publish("demo.broadcast", { text: value, sentAt: Date.now() });
   }
 
   openSecondTab(): void {
@@ -177,7 +403,7 @@ export class MainPageComponent implements OnInit, OnDestroy {
 
   openViewer(): void {
     const name = `viewer-${crypto.randomUUID()}`;
-    window.open("/viewer", name, "popup,width=720,height=580");
+    window.open("/viewer", name, "popup,width=720,height=620");
   }
 
   openDocument(instanceId: string, documentId: string): void {
@@ -186,11 +412,12 @@ export class MainPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.bus.bus.publish(
+    this.showcase.messageBus.publish(
       "viewer.command",
       { command: "open", documentId: documentId.trim() || "DOC-4711" },
       { target: { instanceId } }
     );
+    this.viewerResult.set(`Befehl gezielt an ${this.abbreviate(instanceId)} gesendet.`);
   }
 
   async readViewerState(instanceId: string): Promise<void> {
@@ -199,9 +426,9 @@ export class MainPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.viewerResult.set("Frage Viewer ab …");
+    this.viewerResult.set("Request läuft …");
     try {
-      const state = await this.bus.requests.request(
+      const state = await this.showcase.requests.request(
         "viewer.state.get",
         undefined,
         { target: { instanceId }, timeoutMs: 3_000 }
@@ -219,9 +446,9 @@ export class MainPageComponent implements OnInit, OnDestroy {
     if (!iframe || this.iframeConnection?.connected || this.iframeConnecting) return;
 
     this.iframeConnecting = true;
-    this.iframeStatus.set("Handshake läuft …");
+    this.iframeStatus.set("Bridge-Handshake läuft …");
     try {
-      const connection = await this.bus.bus.connect(
+      const connection = await this.showcase.messageBus.connect(
         iframeBridge({
           iframe,
           origin: "http://127.0.0.1:4300",
@@ -233,13 +460,13 @@ export class MainPageComponent implements OnInit, OnDestroy {
 
       this.iframeConnection = connection;
       this.iframeConnected.set(true);
-      this.iframeStatus.set(`Verbunden mit ${this.abbreviate(connection.remote.instanceId)}.`);
+      this.iframeStatus.set(`Bridge aktiv → ${this.abbreviate(connection.remote.instanceId)}`);
 
       void connection.closed.then(() => {
         if (this.iframeConnection === connection) {
           this.iframeConnection = undefined;
           this.iframeConnected.set(false);
-          this.iframeStatus.set("Bridge wurde geschlossen.");
+          this.iframeStatus.set("Bridge geschlossen.");
         }
       });
     } catch (error) {
@@ -251,9 +478,9 @@ export class MainPageComponent implements OnInit, OnDestroy {
 
   sendIframeMessage(): void {
     if (!this.iframeConnection?.connected) return;
-    this.bus.bus.publish(
+    this.showcase.messageBus.publish(
       "iframe.command",
-      { text: "Hallo aus der Angular-Host-Anwendung" },
+      { text: "Hallo aus dem Angular-Host" },
       { target: { instanceId: this.iframeConnection.remote.instanceId } }
     );
   }
@@ -264,24 +491,26 @@ export class MainPageComponent implements OnInit, OnDestroy {
 
   restoreIframe(): void {
     this.iframeVisible.set(true);
-    this.iframeStatus.set("Neues iframe geladen; Bridge muss erneut verbunden werden.");
+    this.iframeStatus.set("iframe wird neu geladen …");
   }
 
   async loadPersistentLog(): Promise<void> {
-    if (!this.bus.log) return;
-    await this.bus.log.ready();
-    await this.bus.log.flush();
-    const entries = await this.bus.log.read({ order: "desc", limit: 20 });
+    if (!this.showcase.log) return;
+    await this.showcase.log.ready();
+    await this.showcase.log.flush();
+    const entries = await this.showcase.log.read({ order: "desc", limit: 12 });
     this.persistentLogText.set(
       entries.length
-        ? entries.map(entry => `${new Date(entry.timestamp).toLocaleTimeString()}  ${entry.topic}`).join("\n")
+        ? entries
+            .map(entry => `${new Date(entry.timestamp).toLocaleTimeString()}  ${entry.topic}`)
+            .join("\n")
         : "Log ist leer."
     );
   }
 
   async clearPersistentLog(): Promise<void> {
-    if (!this.bus.log) return;
-    await this.bus.log.clear();
+    if (!this.showcase.log) return;
+    await this.showcase.log.clear();
     this.persistentLogText.set("Log wurde gelöscht.");
   }
 
@@ -291,7 +520,7 @@ export class MainPageComponent implements OnInit, OnDestroy {
 
   private pushEvent(text: string): void {
     const next: LogLine = { time: new Date().toLocaleTimeString(), text };
-    this.events.update(events => [next, ...events].slice(0, 12));
+    this.events.update(events => [next, ...events].slice(0, 10));
   }
 
   private abbreviate(value: string): string {

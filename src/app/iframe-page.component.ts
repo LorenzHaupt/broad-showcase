@@ -7,30 +7,31 @@ import { ShowcaseBusService } from "./showcase-bus.service";
   selector: "app-iframe-page",
   standalone: true,
   template: `
-    <main class="iframe-shell">
-      <p class="eyebrow">Cross-Origin Angular iframe</p>
-      <h1>Port 4300</h1>
-      <p>instanceId: <code>{{ bus.bus.instanceId }}</code></p>
-      <p class="status">{{ status() }}</p>
-
-      @if (lastMessage()) {
-        <div class="message-box">{{ lastMessage() }}</div>
-      }
+    <main class="iframe-content">
+      <div>
+        <p class="kicker">Cross-Origin Consumer · :4300</p>
+        <h2>Angular iframe</h2>
+        <p>{{ status() }}</p>
+      </div>
+      <div class="iframe-message">
+        <span class="label">Letzte Nachricht</span>
+        <strong>{{ lastMessage() ?? "Noch keine Nachricht" }}</strong>
+      </div>
     </main>
   `
 })
 export class IframePageComponent implements OnInit, OnDestroy {
-  readonly bus = inject(ShowcaseBusService);
-  readonly status = signal("Warte auf Host-Handshake …");
+  readonly showcase = inject(ShowcaseBusService);
+  readonly status = signal("Warte auf Bridge …");
   readonly lastMessage = signal<string | null>(null);
 
   private connection?: BusConnection;
   private unsubscribeCommand?: Unsubscribe;
 
   ngOnInit(): void {
-    this.unsubscribeCommand = this.bus.bus.subscribe("iframe.command", (payload, context) => {
+    this.unsubscribeCommand = this.showcase.messageBus.subscribe("iframe.command", (payload, context) => {
       this.lastMessage.set(payload.text);
-      this.bus.bus.publish(
+      this.showcase.messageBus.publish(
         "iframe.event",
         { text: `Empfangen: ${payload.text}`, receivedAt: Date.now() },
         { target: { instanceId: context.source.instanceId } }
@@ -42,7 +43,7 @@ export class IframePageComponent implements OnInit, OnDestroy {
 
   private async connectToHost(): Promise<void> {
     try {
-      const connection = await this.bus.bus.connect(
+      const connection = await this.showcase.messageBus.connect(
         windowBridge({
           targetWindow: window.parent,
           origin: "http://127.0.0.1:4200",
@@ -53,12 +54,12 @@ export class IframePageComponent implements OnInit, OnDestroy {
         })
       );
       this.connection = connection;
-      this.status.set(`Bridge aktiv. Host: ${connection.remote.instanceId}`);
+      this.status.set("Bridge aktiv");
 
       void connection.closed.then(() => {
         if (this.connection === connection) {
           this.connection = undefined;
-          this.status.set("Bridge geschlossen.");
+          this.status.set("Bridge geschlossen");
         }
       });
     } catch (error) {

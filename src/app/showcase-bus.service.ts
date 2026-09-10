@@ -12,21 +12,21 @@ const CHANNEL = "browser-message-bus-angular-showcase";
 @Injectable({ providedIn: "root" })
 export class ShowcaseBusService implements OnDestroy {
   readonly role: ShowcaseRole = detectRole();
-  readonly bus: MessageBus<ShowcaseMessages> = createMessageBus<ShowcaseMessages>({
+  readonly messageBus: MessageBus<ShowcaseMessages> = createMessageBus<ShowcaseMessages>({
     channel: CHANNEL,
     appId: this.role
   });
 
-  readonly presence: PresenceApi = this.bus.use(
+  readonly presence: PresenceApi = this.messageBus.use(
     presence({ heartbeatMs: 4_000, peerTimeoutMs: 14_000 })
   );
 
-  readonly requests: RequestReplyApi<ShowcaseRequests> = this.bus.use(
+  readonly requests: RequestReplyApi<ShowcaseRequests> = this.messageBus.use(
     requestReply<ShowcaseRequests>({ defaultTimeoutMs: 3_000 })
   );
 
   readonly log: PersistentLogApi | undefined = this.role === "host"
-    ? this.bus.use(
+    ? this.messageBus.use(
         persistentLog({
           topics: ["demo.broadcast", "viewer.state.changed", "iframe.event"],
           databaseName: "browser-message-bus-angular-showcase",
@@ -49,7 +49,7 @@ export class ShowcaseBusService implements OnDestroy {
   ngOnDestroy(): void {
     this.unsubscribeJoin();
     this.unsubscribeLeave();
-    void this.bus.close();
+    void this.messageBus.close();
   }
 }
 

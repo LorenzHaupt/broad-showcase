@@ -1,5 +1,5 @@
 {
-  "name": "browser-message-bus-angular-showcase",
+  "name": "broad-showcase",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,8 @@
     "start:iframe": "ng serve --host 127.0.0.1 --port 4300",
     "dev": "node scripts/dev.mjs",
     "build": "ng build",
-    "typecheck": "ng build --configuration development"
+    "typecheck": "ng build --configuration development",
+    "verify": "npm run build && npm ls @lorenz/browser-message-bus"
   },
   "dependencies": {
     "@angular/common": "^21.2.23",
